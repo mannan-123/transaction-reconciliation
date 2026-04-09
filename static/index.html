@@ -958,7 +958,7 @@
         fd.append("bank_file", bankFile);
         fd.append("ledger_file", ledgerFile);
         try {
-          const res = await fetch("http://127.0.0.1:8000/api/reconcile", {
+          const res = await fetch("http://127.0.0.1:8080/api/reconcile", {
             method: "POST",
             body: fd,
           });
@@ -975,7 +975,7 @@
       async function loadDemo() {
         showLoader(true);
         try {
-          const res = await fetch("http://127.0.0.1:8000/api/demo");
+          const res = await fetch("http://127.0.0.1:8080/api/demo");
           const data = await res.json();
           document.getElementById("bankName").textContent =
             "bank_statement.csv";
