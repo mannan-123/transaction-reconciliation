@@ -1,0 +1,1429 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>Seafarer Consulting ReconAI — Transaction Reconciliation</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #0a0c10;
+        --surface: #111318;
+        --surface2: #181c24;
+        --border: #1e2330;
+        --accent: #00e5a0;
+        --accent2: #0099ff;
+        --accent3: #ff6b35;
+        --warn: #ffcc00;
+        --text: #e8eaf0;
+        --muted: #6b7280;
+        --danger: #ff4560;
+        --green: #00e5a0;
+        --blue: #0099ff;
+        --orange: #ff6b35;
+        font-size: 15px;
+      }
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: "DM Sans", sans-serif;
+        min-height: 100vh;
+        overflow-x: hidden;
+      }
+
+      /* ── NOISE TEXTURE ── */
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.04'/%3E%3C/svg%3E");
+        pointer-events: none;
+        z-index: 0;
+      }
+
+      /* ── TOP GLOW ── */
+      body::after {
+        content: "";
+        position: fixed;
+        top: -200px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 800px;
+        height: 400px;
+        background: radial-gradient(
+          ellipse,
+          rgba(0, 229, 160, 0.07) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      /* ── LAYOUT ── */
+      .app {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        min-height: 100vh;
+      }
+
+      /* ── HEADER ── */
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1.2rem 2.5rem;
+        border-bottom: 1px solid var(--border);
+        background: rgba(10, 12, 16, 0.8);
+        backdrop-filter: blur(12px);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      .logo-icon {
+        width: 36px;
+        height: 36px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .logo-icon svg {
+        width: 20px;
+        height: 20px;
+      }
+      .logo-text {
+        font-family: "Helvetica", sans-serif;
+        font-weight: 800;
+        font-size: 1.15rem;
+        letter-spacing: -0.01em;
+      }
+      .logo-text span {
+        color: var(--accent);
+      }
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+      .badge {
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 100px;
+        background: rgba(0, 229, 160, 0.12);
+        color: var(--accent);
+        border: 1px solid rgba(0, 229, 160, 0.25);
+      }
+
+      /* ── MAIN ── */
+      main {
+        padding: 2rem 2.5rem;
+        max-width: 1400px;
+        margin: 0 auto;
+        width: 100%;
+      }
+
+      /* ── UPLOAD SECTION ── */
+      .upload-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr auto;
+        gap: 1rem;
+        align-items: end;
+        margin-bottom: 2rem;
+      }
+      .upload-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.5rem;
+        transition: border-color 0.2s, background 0.2s;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+      }
+      .upload-card:hover,
+      .upload-card.drag {
+        border-color: var(--accent);
+        background: rgba(0, 229, 160, 0.04);
+      }
+      .upload-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          135deg,
+          rgba(0, 229, 160, 0.04) 0%,
+          transparent 60%
+        );
+        pointer-events: none;
+      }
+      .upload-label {
+        font-size: 0.75rem;
+        font-family: "DM Mono", monospace;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 0.6rem;
+        display: block;
+      }
+      .upload-filename {
+        font-size: 0.9rem;
+        color: var(--muted);
+        margin-top: 0.4rem;
+        min-height: 1.2em;
+      }
+      .upload-filename.loaded {
+        color: var(--accent);
+      }
+      .upload-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+      .upload-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 1.05rem;
+      }
+      .upload-card input[type="file"] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+
+      .run-btn {
+        background: linear-gradient(135deg, var(--accent), #00b87a);
+        color: #000;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 0.95rem;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: transform 0.15s, box-shadow 0.15s;
+        letter-spacing: 0.02em;
+      }
+      .run-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 30px rgba(0, 229, 160, 0.3);
+      }
+      .run-btn:active {
+        transform: translateY(0);
+      }
+      .run-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .demo-btn {
+        background: transparent;
+        color: var(--accent2);
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 0.8rem 1.4rem;
+        border: 1px solid rgba(0, 153, 255, 0.3);
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .demo-btn:hover {
+        background: rgba(0, 153, 255, 0.1);
+        border-color: var(--accent2);
+      }
+
+      /* ── STATUS PILL ── */
+      .status-bar {
+        display: flex;
+        gap: 0.75rem;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+      }
+      .pill {
+        font-family: "DM Mono", monospace;
+        font-size: 0.72rem;
+        padding: 0.35rem 0.9rem;
+        border-radius: 100px;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .pill.good {
+        background: rgba(0, 229, 160, 0.12);
+        color: var(--green);
+        border: 1px solid rgba(0, 229, 160, 0.2);
+      }
+      .pill.warn {
+        background: rgba(255, 204, 0, 0.12);
+        color: var(--warn);
+        border: 1px solid rgba(255, 204, 0, 0.2);
+      }
+      .pill.danger {
+        background: rgba(255, 69, 96, 0.12);
+        color: var(--danger);
+        border: 1px solid rgba(255, 69, 96, 0.2);
+      }
+      .pill.info {
+        background: rgba(0, 153, 255, 0.12);
+        color: var(--blue);
+        border: 1px solid rgba(0, 153, 255, 0.2);
+      }
+      .pill::before {
+        content: "●";
+        font-size: 0.6rem;
+      }
+
+      /* ── QUICKBOOKS SUMMARY TABLE ── */
+      .summary-section {
+        margin-bottom: 2rem;
+      }
+      .section-title {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      .section-title::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      .qb-table-wrap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .qb-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .qb-table th {
+        background: var(--surface2);
+        font-family: "DM Mono", monospace;
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        padding: 0.9rem 1.2rem;
+        text-align: right;
+        border-bottom: 1px solid var(--border);
+      }
+      .qb-table th:first-child {
+        text-align: left;
+      }
+      .qb-table td {
+        padding: 0.85rem 1.2rem;
+        border-bottom: 1px solid rgba(30, 35, 48, 0.6);
+        font-size: 0.9rem;
+      }
+      .qb-table tr:last-child td {
+        border-bottom: none;
+      }
+      .qb-table td:not(:first-child) {
+        text-align: right;
+        font-family: "DM Mono", monospace;
+      }
+      .qb-table tr.total-row td {
+        font-family: "Helvetica", sans-serif;
+        font-weight: 600;
+        font-size: 1rem;
+        padding-top: 1.2rem;
+        padding-bottom: 1.2rem;
+        background: rgba(0, 229, 160, 0.03);
+        border-top: 2px solid var(--border);
+      }
+      .qb-table .sub-label {
+        font-size: 0.75rem;
+        color: var(--muted);
+        display: block;
+        margin-top: 0.15rem;
+      }
+
+      .diff-zero {
+        color: var(--green);
+      }
+      .diff-nonzero {
+        color: var(--danger);
+        font-weight: 600;
+      }
+      .check-icon {
+        display: inline-flex;
+        width: 20px;
+        height: 20px;
+        background: var(--green);
+        border-radius: 50%;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        color: #000;
+        margin-left: 0.4rem;
+        vertical-align: middle;
+      }
+
+      /* ── KPI CARDS ── */
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+      .kpi {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 1.2rem 1.4rem;
+        position: relative;
+        overflow: hidden;
+      }
+      .kpi::after {
+        content: "";
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+      }
+      .kpi.green::after {
+        background: linear-gradient(90deg, var(--green), transparent);
+      }
+      .kpi.blue::after {
+        background: linear-gradient(90deg, var(--blue), transparent);
+      }
+      .kpi.orange::after {
+        background: linear-gradient(90deg, var(--orange), transparent);
+      }
+      .kpi.danger::after {
+        background: linear-gradient(90deg, var(--danger), transparent);
+      }
+      .kpi-label {
+        font-size: 0.72rem;
+        color: var(--muted);
+        font-family: "DM Mono", monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin-bottom: 0.5rem;
+      }
+      .kpi-value {
+        font-family: "Helvetica", sans-serif;
+        font-weight: 800;
+        font-size: 1.8rem;
+        line-height: 1;
+      }
+      .kpi-sub {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.4rem;
+      }
+
+      /* ── PROGRESS BAR ── */
+      .progress-wrap {
+        margin-bottom: 2rem;
+      }
+      .progress-label {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.4rem;
+        font-size: 0.8rem;
+      }
+      .progress-track {
+        height: 8px;
+        background: var(--surface2);
+        border-radius: 100px;
+        overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%;
+        border-radius: 100px;
+        transition: width 1s ease;
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
+      }
+
+      /* ── TABS ── */
+      .tabs {
+        display: flex;
+        gap: 0.25rem;
+        margin-bottom: 1.5rem;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 0.35rem;
+      }
+      .tab {
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+        font-size: 0.85rem;
+        padding: 0.6rem 1.2rem;
+        border-radius: 9px;
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+      }
+      .tab.active {
+        background: linear-gradient(
+          135deg,
+          rgba(0, 229, 160, 0.15),
+          rgba(0, 153, 255, 0.1)
+        );
+        color: var(--text);
+        border: 1px solid rgba(0, 229, 160, 0.2);
+      }
+      .tab-count {
+        display: inline-flex;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 5px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 100px;
+        font-size: 0.7rem;
+        font-family: "DM Mono", monospace;
+        margin-left: 0.4rem;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .tab.active .tab-count {
+        background: rgba(0, 229, 160, 0.2);
+        color: var(--accent);
+      }
+
+      /* ── TABLE ── */
+      .table-wrap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+      }
+      .table-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.4rem;
+        border-bottom: 1px solid var(--border);
+      }
+      .table-search {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 0.5rem 0.9rem;
+        color: var(--text);
+        font-size: 0.85rem;
+        width: 220px;
+        font-family: "DM Sans", sans-serif;
+      }
+      .table-search:focus {
+        outline: none;
+        border-color: rgba(0, 229, 160, 0.4);
+      }
+      .data-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .data-table th {
+        background: var(--surface2);
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-family: "DM Mono", monospace;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted);
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      .data-table td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(30, 35, 48, 0.5);
+        font-size: 0.85rem;
+        vertical-align: middle;
+      }
+      .data-table tr:hover td {
+        background: rgba(255, 255, 255, 0.015);
+      }
+      .data-table tr:last-child td {
+        border-bottom: none;
+      }
+
+      .badge-match {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.72rem;
+        font-family: "DM Mono", monospace;
+        padding: 0.25rem 0.65rem;
+        border-radius: 6px;
+        font-weight: 500;
+      }
+      .badge-exact {
+        background: rgba(0, 229, 160, 0.12);
+        color: var(--green);
+      }
+      .badge-tolerance {
+        background: rgba(255, 204, 0, 0.12);
+        color: var(--warn);
+      }
+      .badge-fuzzy {
+        background: rgba(255, 107, 53, 0.12);
+        color: var(--orange);
+      }
+      .badge-high {
+        background: rgba(255, 69, 96, 0.15);
+        color: var(--danger);
+      }
+      .badge-medium {
+        background: rgba(255, 204, 0, 0.12);
+        color: var(--warn);
+      }
+      .badge-low {
+        background: rgba(0, 229, 160, 0.1);
+        color: var(--green);
+      }
+
+      .conf-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .conf-track {
+        flex: 1;
+        height: 4px;
+        background: var(--surface2);
+        border-radius: 2px;
+        overflow: hidden;
+        min-width: 60px;
+      }
+      .conf-fill {
+        height: 100%;
+        border-radius: 2px;
+      }
+
+      .amount-pos {
+        color: var(--green);
+      }
+      .amount-neg {
+        color: var(--danger);
+      }
+      .mono {
+        font-family: "DM Mono", monospace;
+      }
+
+      /* ── EMPTY STATE ── */
+      .empty {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: var(--muted);
+      }
+      .empty-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.4;
+      }
+      .empty h3 {
+        font-family: "Syne", sans-serif;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: var(--text);
+      }
+
+      /* ── LOADER ── */
+      .loader-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 12, 16, 0.8);
+        backdrop-filter: blur(4px);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+        gap: 1rem;
+      }
+      .loader-spinner {
+        width: 48px;
+        height: 48px;
+        border: 3px solid rgba(0, 229, 160, 0.2);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .loader-text {
+        font-family: "Syne", sans-serif;
+        font-weight: 600;
+        color: var(--text);
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .hidden {
+        display: none !important;
+      }
+
+      /* ── ANIMATIONS ── */
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .fade-in {
+        animation: fadeUp 0.4s ease both;
+      }
+      .fade-in-1 {
+        animation-delay: 0.05s;
+      }
+      .fade-in-2 {
+        animation-delay: 0.1s;
+      }
+      .fade-in-3 {
+        animation-delay: 0.15s;
+      }
+      .fade-in-4 {
+        animation-delay: 0.2s;
+      }
+      .fade-in-5 {
+        animation-delay: 0.25s;
+      }
+
+      /* ── PAGINATION ── */
+      .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.8rem 1.2rem;
+        border-top: 1px solid var(--border);
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+      .page-btns {
+        display: flex;
+        gap: 0.4rem;
+      }
+      .page-btn {
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.35rem 0.7rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.8rem;
+        transition: all 0.15s;
+      }
+      .page-btn:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .page-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+      .page-btn.active {
+        background: rgba(0, 229, 160, 0.15);
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      /* ── RESPONSIVE ── */
+      @media (max-width: 900px) {
+        .upload-section {
+          grid-template-columns: 1fr 1fr;
+          grid-template-rows: auto auto;
+        }
+        .run-btn {
+          grid-column: 1/-1;
+        }
+        main {
+          padding: 1.2rem;
+        }
+        header {
+          padding: 1rem 1.2rem;
+        }
+      }
+      @media (max-width: 600px) {
+        .upload-section {
+          grid-template-columns: 1fr;
+        }
+        .kpi-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <!-- HEADER -->
+      <header>
+        <div class="logo">
+          <div class="logo-icon">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+          </div>
+          <span class="logo-text">Seafarer Consulting <span> Recon</span> AI</span>
+        </div>
+        <div class="header-right">
+          <span class="badge">v2.0 · Live Engine</span>
+          <button class="demo-btn" onclick="loadDemo()">▶ Run Demo</button>
+        </div>
+      </header>
+
+      <!-- MAIN -->
+      <main>
+        <!-- UPLOAD -->
+        <div class="upload-section fade-in">
+          <div
+            class="upload-card"
+            id="bankCard"
+            ondragover="dragOver(event,'bankCard')"
+            ondragleave="dragLeave('bankCard')"
+            ondrop="dropFile(event,'bank')"
+          >
+            <span class="upload-label">Bank Statement</span>
+            <div class="upload-icon">🏦</div>
+            <div class="upload-title">Drop CSV or click</div>
+            <div class="upload-filename" id="bankName">No file selected</div>
+            <input
+              type="file"
+              accept=".csv"
+              onchange="fileSelected(event,'bank')"
+            />
+          </div>
+          <div
+            class="upload-card"
+            id="ledgerCard"
+            ondragover="dragOver(event,'ledgerCard')"
+            ondragleave="dragLeave('ledgerCard')"
+            ondrop="dropFile(event,'ledger')"
+          >
+            <span class="upload-label">Ledger / QuickBooks Export</span>
+            <div class="upload-icon">📒</div>
+            <div class="upload-title">Drop CSV or click</div>
+            <div class="upload-filename" id="ledgerName">No file selected</div>
+            <input
+              type="file"
+              accept=".csv"
+              onchange="fileSelected(event,'ledger')"
+            />
+          </div>
+          <button class="run-btn" id="runBtn" onclick="runReconcile()" disabled>
+            Reconcile
+          </button>
+        </div>
+
+        <!-- STATUS PILLS -->
+        <div class="status-bar hidden" id="statusBar"></div>
+
+        <!-- RESULTS (hidden until run) -->
+        <div id="results" class="hidden">
+          <!-- QUICKBOOKS SUMMARY TABLE -->
+          <div class="summary-section fade-in fade-in-1">
+            <div class="section-title">Reconciliation Summary</div>
+            <div class="qb-table-wrap">
+              <table class="qb-table">
+                <thead>
+                  <tr>
+                    <th style="text-align: left;">Summary</th>
+                    <th>Statement</th>
+                    <th>QuickBooks (Ledger)</th>
+                    <th>Difference</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- KPI CARDS -->
+          <div class="kpi-grid fade-in fade-in-2" id="kpiGrid"></div>
+
+          <!-- PROGRESS -->
+          <div class="progress-wrap fade-in fade-in-3">
+            <div class="progress-label">
+              <span style="font-family: 'Syne', sans-serif; font-weight: 600;"
+                >Reconciliation Rate (Bank)</span
+              >
+              <span
+                id="progressPct"
+                style="font-family: 'DM Mono', monospace; color: var(--accent);"
+                >0%</span
+              >
+            </div>
+            <div class="progress-track">
+              <div
+                class="progress-fill"
+                id="progressFill"
+                style="width: 0%;"
+              ></div>
+            </div>
+          </div>
+
+          <!-- TABS -->
+          <div class="tabs fade-in fade-in-4" id="tabBar"></div>
+
+          <!-- TABLE CONTAINER -->
+          <div id="tableContainer" class="fade-in fade-in-5"></div>
+        </div>
+      </main>
+    </div>
+
+    <!-- LOADER -->
+    <div class="loader-overlay hidden" id="loader">
+      <div class="loader-spinner"></div>
+      <div class="loader-text">Running reconciliation engine…</div>
+    </div>
+
+    <script>
+      let bankFile = null,
+        ledgerFile = null;
+      let currentData = null;
+      let activeTab = "matches";
+      let searchTerm = "";
+      let currentPage = 1;
+      const PAGE_SIZE = 20;
+
+      // ── File handling ────────────────────────────────────────────────────────────
+      function fileSelected(e, type) {
+        const file = e.target.files[0];
+        if (!file) return;
+        setFile(type, file);
+      }
+      function dragOver(e, id) {
+        e.preventDefault();
+        document.getElementById(id).classList.add("drag");
+      }
+      function dragLeave(id) {
+        document.getElementById(id).classList.remove("drag");
+      }
+      function dropFile(e, type) {
+        e.preventDefault();
+        dragLeave(type === "bank" ? "bankCard" : "ledgerCard");
+        const file = e.dataTransfer.files[0];
+        if (file) setFile(type, file);
+      }
+      function setFile(type, file) {
+        if (type === "bank") {
+          bankFile = file;
+          document.getElementById("bankName").textContent = file.name;
+          document.getElementById("bankName").classList.add("loaded");
+        } else {
+          ledgerFile = file;
+          document.getElementById("ledgerName").textContent = file.name;
+          document.getElementById("ledgerName").classList.add("loaded");
+        }
+        document.getElementById("runBtn").disabled = !(bankFile && ledgerFile);
+      }
+
+      // ── Run reconciliation ───────────────────────────────────────────────────────
+      async function runReconcile() {
+        showLoader(true);
+        const fd = new FormData();
+        fd.append("bank_file", bankFile);
+        fd.append("ledger_file", ledgerFile);
+        try {
+          const res = await fetch("http://127.0.0.1:8000/api/reconcile", {
+            method: "POST",
+            body: fd,
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const data = await res.json();
+          renderAll(data);
+        } catch (err) {
+          alert("Error: " + err.message);
+        } finally {
+          showLoader(false);
+        }
+      }
+
+      async function loadDemo() {
+        showLoader(true);
+        try {
+          const res = await fetch("http://127.0.0.1:8000/api/demo");
+          const data = await res.json();
+          document.getElementById("bankName").textContent =
+            "bank_statement.csv";
+          document.getElementById("bankName").classList.add("loaded");
+          document.getElementById("ledgerName").textContent =
+            "ledbger_transactions.csv";
+          document.getElementById("ledgerName").classList.add("loaded");
+          renderAll(data);
+        } catch (err) {
+          alert("Demo error: " + err.message);
+        } finally {
+          showLoader(false);
+        }
+      }
+
+      function showLoader(v) {
+        document.getElementById("loader").classList.toggle("hidden", !v);
+      }
+
+      // ── Render everything ────────────────────────────────────────────────────────
+      function renderAll(data) {
+        currentData = data;
+        activeTab = "matches";
+        searchTerm = "";
+        currentPage = 1;
+
+        renderStatusBar(data.kpis);
+        renderSummaryTable(data.summary);
+        renderKPIs(data.kpis);
+        renderProgress(data.kpis);
+        renderTabs(data);
+        renderTable();
+
+        document.getElementById("results").classList.remove("hidden");
+        document.getElementById("statusBar").classList.remove("hidden");
+        document
+          .getElementById("results")
+          .scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      // ── Status pills ─────────────────────────────────────────────────────────────
+      function renderStatusBar(kpis) {
+        const rate = kpis.recon_rate_bank;
+        const statusClass =
+          rate >= 95 ? "good" : rate >= 80 ? "warn" : "danger";
+        document.getElementById("statusBar").innerHTML = `
+    <div class="pill ${statusClass}">${rate}% Bank Reconciled</div>
+    <div class="pill ${kpis.recon_rate_ledger >= 95 ? "good" : "warn"}">${
+          kpis.recon_rate_ledger
+        }% Ledger Reconciled</div>
+    <div class="pill info">${kpis.exact_count} Exact Matches</div>
+    <div class="pill ${kpis.high_priority > 0 ? "danger" : "good"}">${
+          kpis.high_priority
+        } High Priority Exceptions</div>
+    <div class="pill info">${kpis.date_range}</div>
+  `;
+      }
+
+      // ── QuickBooks Summary Table ─────────────────────────────────────────────────
+      function renderSummaryTable(s) {
+        const fmtAmt = (v) =>
+          `$${Math.abs(v).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })}`;
+        const diffClass = (d) =>
+          Math.abs(d) < 0.01 ? "diff-zero" : "diff-nonzero";
+        const checkMark = (d) =>
+          Math.abs(d) < 0.01 ? '<span class="check-icon">✓</span>' : "";
+
+        const payDiff = s.stmt_payments - s.qb_payments;
+        const depDiff = s.stmt_deposits - s.qb_deposits;
+        const endDiff = s.ending_diff;
+
+        document.getElementById("summaryTableBody").innerHTML = `
+    <tr>
+      <td><strong>Beginning balance on period start</strong></td>
+      <td class="mono">$${s.beginning_balance.toFixed(2)}</td>
+      <td class="mono">$${s.beginning_balance.toFixed(2)}</td>
+      <td class="mono ${diffClass(0)}">$0.00${checkMark(0)}</td>
+    </tr>
+    <tr>
+      <td>
+        <strong>Total amount in payments</strong>
+        <span class="sub-label">Quantity of payments</span>
+      </td>
+      <td class="mono">
+        ${fmtAmt(s.stmt_payments)}
+        <span class="sub-label">${s.stmt_payment_count} payments</span>
+      </td>
+      <td class="mono">
+        ${fmtAmt(s.qb_payments)}
+        <span class="sub-label">${s.qb_payment_count} payments</span>
+      </td>
+      <td class="mono ${diffClass(payDiff)}">
+        ${
+          Math.abs(payDiff) < 0.01
+            ? "$0.00"
+            : "$" + Math.abs(payDiff).toFixed(2)
+        }${checkMark(payDiff)}
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <strong>Total amount in deposits</strong>
+        <span class="sub-label">Quantity of deposits</span>
+      </td>
+      <td class="mono">
+        ${fmtAmt(s.stmt_deposits)}
+        <span class="sub-label">${s.stmt_deposit_count} deposits</span>
+      </td>
+      <td class="mono">
+        ${fmtAmt(s.qb_deposits)}
+        <span class="sub-label">${s.qb_deposit_count} deposits</span>
+      </td>
+      <td class="mono ${diffClass(depDiff)}">
+        ${
+          Math.abs(depDiff) < 0.01
+            ? "$0.00"
+            : "$" + Math.abs(depDiff).toFixed(2)
+        }${checkMark(depDiff)}
+      </td>
+    </tr>
+    <tr class="total-row">
+      <td>
+        <strong>Ending balance on period end</strong>
+      </td>
+      <td class="mono">${fmtAmt(s.stmt_ending)}</td>
+      <td class="mono" style="color:var(--accent2)">${fmtAmt(s.qb_ending)}</td>
+      <td class="mono ${diffClass(endDiff)}" style="font-size:1.1rem">
+        ${
+          Math.abs(endDiff) < 0.01
+            ? "$0.00"
+            : "$" + Math.abs(endDiff).toFixed(2)
+        }${checkMark(endDiff)}
+      </td>
+    </tr>
+  `;
+      }
+
+      // ── KPI Cards ────────────────────────────────────────────────────────────────
+      function renderKPIs(k) {
+        const cards = [
+          {
+            label: "Bank Match Rate",
+            value: k.recon_rate_bank + "%",
+            sub: `${k.matched_bank}/${k.total_bank} txns`,
+            color: "green",
+          },
+          {
+            label: "Ledger Match Rate",
+            value: k.recon_rate_ledger + "%",
+            sub: `${k.matched_ledger}/${k.total_ledger} txns`,
+            color: "blue",
+          },
+          {
+            label: "Exact Matches",
+            value: k.exact_count.toLocaleString(),
+            sub: "Perfect reference+amount",
+            color: "green",
+          },
+          {
+            label: "Probabilistic Matches",
+            value: k.tolerance_count.toLocaleString(),
+            sub: "Within ±1% tolerance",
+            color: "blue",
+          },
+          {
+            label: "Semantic Matches",
+            value: k.fuzzy_count.toLocaleString(),
+            sub: "Reference similarity",
+            color: "orange",
+          },
+          {
+            label: "Exceptions",
+            value: (
+              k.unmatched_bank_count + k.unmatched_ledger_count
+            ).toLocaleString(),
+            sub: `${k.high_priority} high priority`,
+            color: k.high_priority > 0 ? "danger" : "green",
+          },
+          {
+            label: "Value Processed",
+            value: "$" + abbrev(k.total_value_processed),
+            sub: "Total absolute",
+            color: "blue",
+          },
+        ];
+        document.getElementById("kpiGrid").innerHTML = cards
+          .map(
+            (c) => `
+    <div class="kpi ${c.color}">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+      <div class="kpi-sub">${c.sub}</div>
+    </div>
+  `,
+          )
+          .join("");
+      }
+
+      function abbrev(n) {
+        if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+        if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+        return n.toFixed(0);
+      }
+
+      // ── Progress ─────────────────────────────────────────────────────────────────
+      function renderProgress(k) {
+        const pct = k.recon_rate_bank;
+        document.getElementById("progressPct").textContent = pct + "%";
+        setTimeout(() => {
+          document.getElementById("progressFill").style.width = pct + "%";
+        }, 100);
+      }
+
+      // ── Tabs ──────────────────────────────────────────────────────────────────────
+      function renderTabs(data) {
+        const m = data.matches.length;
+        const u = data.unmatched.length;
+        const tabs = [
+          { id: "matches", label: "Matched", count: m },
+          { id: "unmatched", label: "Exceptions", count: u },
+          { id: "exact", label: "Exact", count: data.kpis.exact_count },
+          { id: "Semantic", label: "Needs Review", count: data.kpis.fuzzy_count },
+        ];
+        document.getElementById("tabBar").innerHTML = tabs
+          .map(
+            (t) => `
+    <button class="tab ${
+      t.id === activeTab ? "active" : ""
+    }" onclick="switchTab('${t.id}')">
+      ${t.label}<span class="tab-count">${t.count}</span>
+    </button>
+  `,
+          )
+          .join("");
+      }
+
+      function switchTab(id) {
+        activeTab = id;
+        currentPage = 1;
+        searchTerm = "";
+        // re-render tabs
+        renderTabs(currentData);
+        renderTable();
+      }
+
+      // ── Table ─────────────────────────────────────────────────────────────────────
+      function getRows() {
+        let rows;
+        if (activeTab === "matches") rows = currentData.matches;
+        else if (activeTab === "unmatched") rows = currentData.unmatched;
+        else if (activeTab === "exact")
+          rows = currentData.matches.filter((r) => r.match_type === "Exact");
+        else if (activeTab === "Semantic")
+          rows = currentData.matches.filter((r) => r.match_type === "Semantic");
+        else rows = [];
+
+        if (searchTerm) {
+          const s = searchTerm.toLowerCase();
+          rows = rows.filter((r) =>
+            Object.values(r).some((v) => String(v).toLowerCase().includes(s)),
+          );
+        }
+        return rows;
+      }
+
+      function renderTable() {
+        const rows = getRows();
+        const total = rows.length;
+        const start = (currentPage - 1) * PAGE_SIZE;
+        const pageRows = rows.slice(start, start + PAGE_SIZE);
+
+        const isMatched = activeTab !== "unmatched";
+
+        const columns = isMatched
+          ? [
+              "Bank ID",
+              "Ledger ID",
+              "Date (Bank)",
+              "Date (Ledger)",
+              "Amount (Bank)",
+              "Amount (Ledger)",
+              "Diff",
+              "Reference",
+              "Type",
+              "Confidence",
+            ]
+          : [
+              "Transaction ID",
+              "Date",
+              "Amount",
+              "Reference",
+              "Description",
+              "Source",
+              "Days Old",
+              "Priority",
+            ];
+
+        const th = columns.map((c) => `<th>${c}</th>`).join("");
+
+        const tbody = pageRows
+          .map((r) => {
+            if (isMatched) {
+              const conf = r.confidence;
+              const confColor =
+                conf >= 90
+                  ? "var(--green)"
+                  : conf >= 70
+                  ? "var(--warn)"
+                  : "var(--orange)";
+              const diffDisplay =
+                Math.abs(r.amount_diff) < 0.01
+                  ? '<span style="color:var(--green)">$0.00</span>'
+                  : `<span style="color:var(--danger)">$${r.amount_diff.toFixed(
+                      2,
+                    )}</span>`;
+              const typeClass =
+                r.match_type === "Exact"
+                  ? "badge-exact"
+                  : r.match_type === "Probabilistic"
+                  ? "badge-tolerance"
+                  : "badge-fuzzy";
+              return `<tr>
+        <td class="mono" style="font-size:.8rem">${r.bank_id}</td>
+        <td class="mono" style="font-size:.8rem">${r.ledger_id}</td>
+        <td class="mono">${r.date_bank}</td>
+        <td class="mono" style="color:${
+          r.date_diff_days > 0 ? "var(--warn)" : "var(--muted)"
+        }">${r.date_ledger}</td>
+        <td class="mono ${
+          r.amount_bank >= 0 ? "amount-pos" : "amount-neg"
+        }">${fmtAmt(r.amount_bank)}</td>
+        <td class="mono ${
+          r.amount_ledger >= 0 ? "amount-pos" : "amount-neg"
+        }">${fmtAmt(r.amount_ledger)}</td>
+        <td>${diffDisplay}</td>
+        <td style="font-size:.8rem;color:var(--muted)">${r.reference_bank}</td>
+        <td><span class="badge-match ${typeClass}">${r.match_type}</span></td>
+        <td>
+          <div class="conf-bar">
+            <div class="conf-track"><div class="conf-fill" style="width:${conf}%;background:${confColor}"></div></div>
+            <span class="mono" style="font-size:.75rem;color:${confColor};min-width:32px">${conf}%</span>
+          </div>
+        </td>
+      </tr>`;
+            } else {
+              const prClass =
+                r.priority === "High"
+                  ? "badge-high"
+                  : r.priority === "Medium"
+                  ? "badge-medium"
+                  : "badge-low";
+              const srcColor =
+                r.source === "Bank" ? "var(--blue)" : "var(--orange)";
+              return `<tr>
+        <td class="mono" style="font-size:.8rem">${r.transaction_id}</td>
+        <td class="mono">${r.date}</td>
+        <td class="mono ${
+          r.amount >= 0 ? "amount-pos" : "amount-neg"
+        }">${fmtAmt(r.amount)}</td>
+        <td style="font-size:.8rem;color:var(--muted)">${r.reference}</td>
+        <td style="font-size:.8rem;color:var(--muted)">${
+          r.description || ""
+        }</td>
+        <td><span style="color:${srcColor};font-family:'DM Mono',monospace;font-size:.8rem">${
+                r.source
+              }</span></td>
+        <td class="mono" style="color:${
+          r.days_unmatched > 7 ? "var(--danger)" : "var(--muted)"
+        }">${r.days_unmatched}d</td>
+        <td><span class="badge-match ${prClass}">${r.priority}</span></td>
+      </tr>`;
+            }
+          })
+          .join("");
+
+        const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+        const pageNums = [];
+        for (
+          let p = Math.max(1, currentPage - 2);
+          p <= Math.min(totalPages, currentPage + 2);
+          p++
+        )
+          pageNums.push(p);
+
+        document.getElementById("tableContainer").innerHTML = `
+    <div class="table-wrap">
+      <div class="table-header">
+        <span style="font-family:'Syne',sans-serif;font-weight:600;font-size:.95rem">${total.toLocaleString()} records</span>
+        <input class="table-search" placeholder="Search…" value="${searchTerm}" oninput="doSearch(this.value)"/>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead><tr>${th}</tr></thead>
+          <tbody>${
+            tbody ||
+            '<tr><td colspan="10" style="text-align:center;padding:3rem;color:var(--muted)">No records found</td></tr>'
+          }</tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <span>Showing ${start + 1}–${Math.min(
+          start + PAGE_SIZE,
+          total,
+        )} of ${total}</span>
+        <div class="page-btns">
+          <button class="page-btn" onclick="goPage(${currentPage - 1})" ${
+          currentPage <= 1 ? "disabled" : ""
+        }>‹ Prev</button>
+          ${pageNums
+            .map(
+              (p) =>
+                `<button class="page-btn ${
+                  p === currentPage ? "active" : ""
+                }" onclick="goPage(${p})">${p}</button>`,
+            )
+            .join("")}
+          <button class="page-btn" onclick="goPage(${currentPage + 1})" ${
+          currentPage >= totalPages ? "disabled" : ""
+        }>Next ›</button>
+        </div>
+      </div>
+    </div>
+  `;
+      }
+
+      function fmtAmt(v) {
+        const abs = Math.abs(v).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        return (v < 0 ? "-" : "") + "$" + abs;
+      }
+
+      function doSearch(val) {
+        searchTerm = val;
+        currentPage = 1;
+        renderTable();
+      }
+
+      function goPage(p) {
+        const rows = getRows();
+        const total = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+        currentPage = Math.max(1, Math.min(p, total));
+        renderTable();
+      }
+    </script>
+  </body>
+</html>
