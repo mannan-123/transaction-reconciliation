@@ -10,6 +10,9 @@ from datetime import datetime
 import re
 from typing import Optional
 import uvicorn
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = FastAPI(title="Recon AI", version="2.0")
 
@@ -311,8 +314,8 @@ async def root():
 @app.get("/api/demo")
 async def demo():
     # bank_df, ledger_df = generate_demo_data()
-    bank_df = pd.read_csv(r"data\bank_statement.csv")
-    ledger_df = pd.read_csv(r"data\ledger_transactions.csv")
+    bank_df = pd.read_csv(os.path.join(BASE_DIR, "data", "bank_statement.csv"))
+    ledger_df = pd.read_csv(os.path.join(BASE_DIR, "data", "ledger_transactions.csv"))
     result = reconcile(bank_df, ledger_df)
     return JSONResponse(result)
 
